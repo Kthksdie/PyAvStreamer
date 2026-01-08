@@ -109,11 +109,13 @@ def stream_audio_task(pyaudio_instance, device_index, device_name, port, stop_ev
     # FFmpeg command
     cmd = [
         FFMPEG_BIN,
+        '-use_wallclock_as_timestamps', '1',
         '-f', 's16le',
         '-ar', str(AUDIO_RATE),
         '-ac', str(AUDIO_CHANNELS),
         '-i', 'pipe:0',
         '-c:a', 'libmp3lame',
+        '-fflags', '+genpts',
         '-f', 'mpegts',
         f'udp://{OBS_IP}:{port}?pkt_size=1316'
     ]
@@ -210,6 +212,7 @@ def stream_video_task(device_index, device_name, port, stop_event):
     cmd = [
         FFMPEG_BIN,
         '-y',
+        '-use_wallclock_as_timestamps', '1',
         '-f', 'rawvideo',
         '-vcodec', 'rawvideo',
         '-pix_fmt', 'bgr24',       # OpenCV uses BGR
@@ -219,6 +222,7 @@ def stream_video_task(device_index, device_name, port, stop_event):
         '-c:v', 'libx264',         # Encode to H.264
         '-preset', 'ultrafast',    # Low latency preset
         '-tune', 'zerolatency',    # Low latency tuning
+        '-fflags', '+genpts',
         '-f', 'mpegts',            # Container
         f'udp://{OBS_IP}:{port}?pkt_size=1316'
     ]
