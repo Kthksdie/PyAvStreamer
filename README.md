@@ -33,59 +33,69 @@ PyAvStreamer is a comprehensive Python application that streams both audio and v
 
 ## Usage
 
-The project contains two main scripts: `audioCast.py` for audio streaming and `videoCast.py` for video streaming.
+The project now runs a single unified script: `src/pyAvStreamer.py`.
 
-### Audio Streaming (`audioCast.py`)
+### Basic Usage
 
-1.  Run the application:
-    ```bash
-    python audioCast.py
-    ```
+Run the application with default settings:
+```bash
+python src/pyAvStreamer.py
+```
+Follow the interactive menu to add Video or Audio streams.
 
-2.  **Select Audio Source:**
-    -   Enter the **Index** of a specific microphone to stream just that device.
-    -   Enter **'A'** to stream **ALL** detected input devices simultaneously.
+### CLI Arguments
 
-### Video Streaming (`videoCast.py`)
+You can customize the behavior using command-line arguments:
 
-1.  Run the application:
-    ```bash
-    python videoCast.py
-    ```
+| Argument | Description | Default |
+| :--- | :--- | :--- |
+| `--obs-ip` | IP address of the OBS machine. | `127.0.0.1` |
+| `--base-port-audio` | Base UDP port for audio streams. | `1337` |
+| `--base-port-video` | Base UDP port for video streams. | `1729` |
+| `--stream-type` | Stream type to enable (`audio`, `video`, `both`). | Manual selection |
+| `--max-quality` | Attempt to use the maximum resolution and FPS supported by the camera. | `False` |
 
-2.  **Select Video Source:**
-    -   Enter the **Index** of a specific camera to stream just that device.
-    -   Enter **'A'** to stream **ALL** detected video devices simultaneously.
+### Examples
+
+**Stream video only, automatically selecting all cameras:**
+```bash
+python src/pyAvStreamer.py --stream-type video
+```
+
+**Stream audio only, automatically selecting all microphones:**
+```bash
+python src/pyAvStreamer.py --stream-type audio
+```
+
+**Send to a specific OBS IP address:**
+```bash
+python src/pyAvStreamer.py --obs-ip 192.168.1.50
+```
 
 ## Receive in OBS
+
 ### Audio
-1. Add a "Media Source".
-2. Uncheck "Local File".
-3. Set "Input" to:
-    - **Single Device**: `udp://127.0.0.1:1337`
-    - **All Devices**:
-        - Device 1: `udp://127.0.0.1:1337`
-        - Device 2: `udp://127.0.0.1:1338`
-        - (and so on...)
-4. Set "Input Format" to `mpegts`.
+1. Add a **"Media Source"**.
+2. Uncheck **"Local File"**.
+3. Set **"Input"** to:
+    - **Device 1**: `udp://127.0.0.1:1337`
+    - **Device 2**: `udp://127.0.0.1:1338`
+    - (and so on, incrementing port by 1)
+4. Set **"Input Format"** to `mpegts`.
 
 ### Video
 1.  Add a **"Media Source"**.
 2.  Uncheck **"Local File"**.
 3.  Set **"Input"** to:
-    - **Single Device**: `udp://127.0.0.1:12345`
-    - **All Devices**:
-        - Camera 1: `udp://127.0.0.1:12345`
-        - Camera 2: `udp://127.0.0.1:12346`
-        - (and so on...)
+    - **Camera 1**: `udp://127.0.0.1:1729`
+    - **Camera 2**: `udp://127.0.0.1:1730`
+    - (and so on, incrementing port by 1)
 4.  Set **"Input Format"** to `mpegts`.
 5.  (Optional) Uncheck "Use hardware decoding" if you experience issues.
 
-## Configuration
+## Configuration Details
 
--   **Audio Codec:** Uses `libmp3lame` for low latency.
+-   **Audio Codec:** `libmp3lame` (low latency).
 -   **Video Codec:** `libx264` (ultrafast preset, zerolatency tune).
 -   **Container:** `mpegts`.
 -   **Video Pixel Format:** `bgr24` (raw video piped from OpenCV).
-
-
