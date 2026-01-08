@@ -283,6 +283,8 @@ def main():
 
     p = pyaudio.PyAudio()
     active_threads = []
+    audio_offset = 0
+    video_offset = 0
     stop_event = threading.Event()
     
     # Auto-start logic
@@ -329,7 +331,7 @@ def main():
                 to_start = []
                 
                 if sel.upper() == 'A':
-                    from_port = BASE_PORT_AUDIO + len(active_threads) # simple offset logic
+                    from_port = BASE_PORT_AUDIO + audio_offset
                     for i, (idx, name) in enumerate(devices):
                         to_start.append((idx, name, from_port + i))
                 else:
@@ -337,13 +339,14 @@ def main():
                         idx = int(sel)
                         name = next((n for i, n in devices if i == idx), None)
                         if name:
-                            port = BASE_PORT_AUDIO + len(active_threads)
+                            port = BASE_PORT_AUDIO + audio_offset
                             to_start.append((idx, name, port))
                         else:
                             print("Invalid index.")
                     except ValueError:
                         print("Invalid input.")
 
+                audio_offset += len(to_start)
                 for idx, name, port in to_start:
                     t = threading.Thread(
                         target=stream_audio_task,
@@ -372,7 +375,7 @@ def main():
                 to_start = []
                 
                 if sel.upper() == 'A':
-                    from_port = BASE_PORT_VIDEO + len(active_threads)
+                    from_port = BASE_PORT_VIDEO + video_offset
                     for i, (idx, name) in enumerate(devices):
                         to_start.append((idx, name, from_port + i))
                 else:
@@ -380,13 +383,14 @@ def main():
                         idx = int(sel)
                         name = next((n for i, n in devices if i == idx), None)
                         if name:
-                            port = BASE_PORT_VIDEO + len(active_threads)
+                            port = BASE_PORT_VIDEO + video_offset
                             to_start.append((idx, name, port))
                         else:
                             print("Invalid index.")
                     except ValueError:
                         print("Invalid input.")
 
+                video_offset += len(to_start)
                 for idx, name, port in to_start:
                     t = threading.Thread(
                         target=stream_video_task,
