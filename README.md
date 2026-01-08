@@ -5,7 +5,9 @@ PyAvStreamer is a comprehensive Python application that streams both audio and v
 ## Prerequisites
 
 - Python 3.8+
+    - Windows: `winget install --id Python.Python.3.13 -v 3.13.0`
 - [FFmpeg](https://ffmpeg.org/download.html) installed and operational in your system's PATH.
+    - Windows: `winget install Gyan.FFmpeg`
 
 ## Installation
 
