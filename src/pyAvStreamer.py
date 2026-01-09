@@ -109,7 +109,7 @@ def stream_audio_task(pyaudio_instance, device_index, device_name, port, stop_ev
     Worker function to stream audio from a specific device to a UDP port.
     """
     print(f"[Audio] Stream for '{device_name}' starting...")
-    print(f" - udp://{OBS_IP}:{port}")
+    print(f" - srt://@:{port?mode=listener&latency=50000")
 
     FFMPEG_BIN = get_ffmpeg_path()
     if not FFMPEG_BIN:
@@ -147,7 +147,7 @@ def stream_audio_task(pyaudio_instance, device_index, device_name, port, stop_ev
         '-c:a', 'libmp3lame',
         '-b:a', '128k',               # Explicit bitrate helps maintain steady flow
         '-f', 'mpegts',
-        f'udp://{OBS_IP}:{port}?pkt_size=1316'
+        f'srt://{OBS_IP}:{port}?mode=caller&latency=50000'
     ]
 
     try:
