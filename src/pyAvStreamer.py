@@ -7,17 +7,17 @@ import sys
 import threading
 import time
 import argparse
+import ctypes
+import queue
 
 # --- Configuration ---
 OBS_IP = "127.0.0.1"
 BASE_PORT_AUDIO = 1337
 BASE_PORT_VIDEO = 1729
-CHUNK = 1024
+CHUNK = 4096
 AUDIO_FORMAT = pyaudio.paInt16
 AUDIO_CHANNELS = 1
 AUDIO_RATE = 44100
-VIDEO_WIDTH = 0
-VIDEO_HEIGHT = 0
 VIDEO_WIDTH = 0
 VIDEO_HEIGHT = 0
 VIDEO_FPS = 0
@@ -40,6 +40,30 @@ def get_ffmpeg_path():
             return path
             
     return None
+
+def set_high_priority():
+    """Sets the process priority to High on Windows."""
+    try:
+        # HIGH_PRIORITY_CLASS = 0x00000080
+        pid = os.getpid()
+        kernel32 = ctypes.windll.kernel32
+        
+        kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+        kernel32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        kernel32.SetPriorityClass.restype = ctypes.c_bool
+        
+        handle = kernel32.GetCurrentProcess()
+        
+        # Enable extended error info if needed, but usually just GetLastError works if called immediately.
+        success = kernel32.SetPriorityClass(handle, 0x00000080)
+        
+        if not success:
+            err_code = kernel32.GetLastError()
+            print(f"Warning: Failed to set process priority to HIGH. Error code: {err_code}")
+        else:
+            print("Process priority set to HIGH.")
+    except Exception as e:
+        print(f"Warning: Failed to set process priority: {e}")
 
 # --- Audio Functions ---
 
@@ -114,8 +138,14 @@ def stream_audio_task(pyaudio_instance, device_index, device_name, port, stop_ev
         '-ar', str(AUDIO_RATE),
         '-ac', str(AUDIO_CHANNELS),
         '-i', 'pipe:0',
+        # --- New Optimization Flags ---
+        '-probesize', '32',           # Minimal data analysis before starting
+        '-analyzeduration', '0',      # Start streaming instantly
+        '-fflags', 'nobuffer+genpts', # Disable FFmpeg's internal buffer
+        '-flush_packets', '1',        # Push every packet to the network immediately
+        # ------------------------------
         '-c:a', 'libmp3lame',
-        '-fflags', '+genpts',
+        '-b:a', '128k',               # Explicit bitrate helps maintain steady flow
         '-f', 'mpegts',
         f'udp://{OBS_IP}:{port}?pkt_size=1316'
     ]
@@ -128,26 +158,74 @@ def stream_audio_task(pyaudio_instance, device_index, device_name, port, stop_ev
         stream.close()
         return
 
+    audio_queue = queue.Queue(maxsize=50)
+    local_stop_event = threading.Event()
+
+    def read_mic():
+        """Reads data from microphone and puts into queue."""
+        try:
+            while not stop_event.is_set() and not local_stop_event.is_set():
+                try:
+                    data = stream.read(CHUNK, exception_on_overflow=False)
+                    if not data:
+                        break
+                    audio_queue.put(data)
+                except Exception as e:
+                    if not stop_event.is_set() and not local_stop_event.is_set():
+                        print(f"Error reading audio {device_name}: {e}")
+                    local_stop_event.set()
+                    break
+        except Exception:
+            local_stop_event.set()
+
+    def write_ffmpeg():
+        """Reads data from queue and writes to FFmpeg stdin."""
+        try:
+            while not stop_event.is_set() and not local_stop_event.is_set():
+                try:
+                    data = audio_queue.get(timeout=0.5)
+                    try:
+                        proc.stdin.write(data)
+                    except Exception as e:
+                        if not stop_event.is_set() and not local_stop_event.is_set():
+                            print(f"Error writing audio to ffmpeg {device_name}: {e}")
+                        local_stop_event.set()
+                        break
+                    finally:
+                        audio_queue.task_done()
+                except queue.Empty:
+                    continue
+        except Exception:
+            local_stop_event.set()
+
+    reader_thread = threading.Thread(target=read_mic, daemon=True)
+    writer_thread = threading.Thread(target=write_ffmpeg, daemon=True)
+
+    reader_thread.start()
+    writer_thread.start()
+
+    # Wait until global stop or local error
+    while not stop_event.is_set() and not local_stop_event.is_set():
+        time.sleep(0.5)
+
+    print(f"Stopping audio stream: {device_name}")
+    
+    # Ensure threads stop
+    local_stop_event.set()
+
+    # Cleanup
     try:
-        while not stop_event.is_set():
-            try:
-                data = stream.read(CHUNK, exception_on_overflow=False)
-                proc.stdin.write(data)
-            except Exception as e:
-                if not stop_event.is_set():
-                    print(f"Error streaming audio {device_name}: {e}")
-                break
-    except Exception:
-        pass
-    finally:
-        print(f"Stopping audio stream: {device_name}")
         stream.stop_stream()
         stream.close()
-        try:
-            proc.stdin.close()
-            proc.wait(timeout=2)
-        except:
-            proc.kill()
+    except:
+        pass
+
+    try:
+        proc.stdin.close()
+        proc.wait(timeout=2)
+    except:
+        proc.kill()
+
 
 # --- Video Functions ---
 
@@ -262,6 +340,8 @@ def stream_video_task(device_index, device_name, port, stop_event):
 
 def main():
     global OBS_IP, BASE_PORT_AUDIO, BASE_PORT_VIDEO, USE_MAX_QUALITY
+
+    set_high_priority()
 
     if not get_ffmpeg_path():
         print("Error: FFmpeg not found. Please install it or add it to your PATH.")
