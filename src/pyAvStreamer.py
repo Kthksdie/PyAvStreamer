@@ -109,7 +109,7 @@ def stream_audio_task(pyaudio_instance, device_index, device_name, port, stop_ev
     Worker function to stream audio from a specific device to a UDP port.
     """
     print(f"[Audio] Stream for '{device_name}' starting...")
-    print(f" - srt://@:{port}?mode=listener&latency=50000")
+    print(f" - udp://{OBS_IP}:{port}")
 
     FFMPEG_BIN = get_ffmpeg_path()
     if not FFMPEG_BIN:
@@ -147,12 +147,12 @@ def stream_audio_task(pyaudio_instance, device_index, device_name, port, stop_ev
         '-c:a', 'libmp3lame',
         '-b:a', '128k',               # Explicit bitrate helps maintain steady flow
         '-f', 'mpegts',
-        f'srt://{OBS_IP}:{port}?mode=caller&latency=50000'
+        f'udp://{OBS_IP}:{port}?pkt_size=1316'
     ]
 
     try:
         # Silencing stderr to avoid console spam
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=sys.stderr)
     except Exception as e:
         print(f"Failed to start FFmpeg for {device_name}: {e}")
         stream.close()
