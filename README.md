@@ -95,6 +95,8 @@ python src/pyAvStreamer.py --obs-ip 192.168.1.50
 
 ## Configuration Details
 
+---
+*Created with [Gemini](https://gemini.google.com) by [Kthksdie](https://x.com/jasonlee2122).*
 -   **Audio Codec:** `libmp3lame` (low latency).
 -   **Video Codec:** `libx264` (ultrafast preset, zerolatency tune).
 -   **Container:** `mpegts`.
